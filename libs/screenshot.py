@@ -16,13 +16,13 @@ Builder.load_string('''
     keep_ratio: False
     canvas.after:
         Color:
-            rgb: 1, 1, 1
-        Ellipse:
+            rgba: 1, 1, 1, int(root.show_cursor)
+        Rectangle:
             size:
                 root.cursor_size, \
                 root.cursor_size
             pos: root.cursor_pos
-            source: 'libs/cursor.png'
+            source: 'assets/icons/cursor.png'
 ''')
 
 
