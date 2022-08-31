@@ -1,19 +1,17 @@
 from io import BytesIO
 
-from kivy.clock import Clock, mainthread
+from kivy.clock import Clock
 from kivy.core.image import Image as CoreImage
 from kivy.lang import Builder
 from kivy.properties import BooleanProperty, ListProperty, NumericProperty
 from kivy.uix.image import Image
-from Xlib.display import Display
 from PIL import ImageGrab
+from Xlib.display import Display
 
-__all__ = ('shoot', 'Shoot')
+__all__ = ('Shoot', )
 
 Builder.load_string('''
 <Shoot>:
-    allow_stretch: True
-    keep_ratio: False
     canvas.after:
         Color:
             rgba: 1, 1, 1, int(root.show_cursor)
@@ -26,39 +24,43 @@ Builder.load_string('''
 ''')
 
 
-def shoot(*largs):
-    cached_screenshot = BytesIO()
-    img = ImageGrab.grab(all_screens=True)
-    img.save(cached_screenshot, format='png')
-    cached_screenshot.seek(0)
-
-    texture = CoreImage(
-        cached_screenshot,
-        ext='png'
-    ).texture
-
-    return texture
-
-
 class Shoot(Image):
+    active = BooleanProperty(True)
+    allow_stretch = BooleanProperty(True)
     cursor_pos = ListProperty((0, 0))
     cursor_size = NumericProperty('20dp')
+    keep_ratio = BooleanProperty(False)
     show_cursor = BooleanProperty(True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        Clock.schedule_once(self.frame, 0)
+        self._bytesio = BytesIO()
+        Clock.schedule_once(self._frame, 0)
 
-    @mainthread
-    def frame(self, *largs):
-        self.texture = shoot(self.size)
+    def get_screenshot(self, *largs):
+        img = ImageGrab.grab(all_screens=True)
+        img.save(self._bytesio, format='png')
+        self._bytesio.seek(0)
 
-        if self.show_cursor:
-            Clock.schedule_once(self.cursor_position, 0)
+        texture = CoreImage(
+            self._bytesio,
+            ext='png'
+        ).texture
+        self._bytesio.seek(0)
+        self._bytesio.flush()
 
-        Clock.schedule_once(self.frame, 0)
+        return texture
 
-    def cursor_position(self, pos, *largs):
+    def _frame(self, *largs):
+        if self.active:
+            self.texture = self.get_screenshot()
+
+            if self.show_cursor:
+                self.cursor_pos = self.cursor_position()
+
+            Clock.schedule_once(self._frame, 0)
+
+    def cursor_position(self, *largs):
         """ Calculate position from python-xlib
             and translate into Widget size """
 
@@ -74,7 +76,9 @@ class Shoot(Image):
         y = pos[1] / tsize[1] * norm[1]
         invert_y = self.height - y
 
-        self.cursor_pos = x, invert_y - self.cursor_size
+        cursor_pos = x, invert_y - self.cursor_size
+
+        return cursor_pos
 
 
 if __name__ == '__main__':

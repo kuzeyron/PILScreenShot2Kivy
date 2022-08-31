@@ -1,1 +1,1 @@
-# PILScreenShot2Kivy
+# X11ScreenShot2Kivy
