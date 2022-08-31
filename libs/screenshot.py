@@ -1,12 +1,13 @@
 from io import BytesIO
+from subprocess import check_output
 
 from kivy.clock import Clock
 from kivy.core.image import Image as CoreImage
 from kivy.lang import Builder
-from kivy.properties import BooleanProperty, ListProperty, NumericProperty
+from kivy.properties import (BooleanProperty, ListProperty, NumericProperty,
+                             StringProperty)
 from kivy.uix.image import Image
 from PIL import ImageGrab
-from Xlib.display import Display
 
 __all__ = ('Shoot', )
 
@@ -20,13 +21,14 @@ Builder.load_string('''
                 root.cursor_size, \
                 root.cursor_size
             pos: root.cursor_pos
-            source: 'assets/icons/cursor.png'
+            source: root.cursor_icon
 ''')
 
 
 class Shoot(Image):
     active = BooleanProperty(True)
     allow_stretch = BooleanProperty(True)
+    cursor_icon = StringProperty('assets/icons/cursor.png')
     cursor_pos = ListProperty((0, 0))
     cursor_size = NumericProperty('20dp')
     keep_ratio = BooleanProperty(False)
@@ -46,6 +48,7 @@ class Shoot(Image):
             self._bytesio,
             ext='png'
         ).texture
+
         self._bytesio.seek(0)
         self._bytesio.flush()
 
@@ -61,19 +64,21 @@ class Shoot(Image):
             Clock.schedule_once(self._frame, 0)
 
     def cursor_position(self, *largs):
-        """ Calculate position from python-xlib
-            and translate into Widget size """
-
-        disp = Display()
-        screen = disp.screen()
-
-        pos = screen.root.query_pointer()._data
-        pos = pos['root_x'], pos['root_y']
+        cords = dict([
+            tuple(
+                float(value) if value.isdigit() else value
+                for value in item.split(":")
+            )
+            for item in check_output(
+                ['xdotool', 'getmouselocation'],
+                encoding='utf8'
+            ).split()
+        ])
 
         tsize = self.texture_size
         norm = self.norm_image_size
-        x = pos[0] / tsize[0] * norm[0]
-        y = pos[1] / tsize[1] * norm[1]
+        x = cords['x'] / tsize[0] * norm[0]
+        y = cords['y'] / tsize[1] * norm[1]
         invert_y = self.height - y
 
         cursor_pos = x, invert_y - self.cursor_size
@@ -87,4 +92,5 @@ if __name__ == '__main__':
     class TestApp(App):
         def build(self):
             return Shoot()
+
     TestApp().run()
